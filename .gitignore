@@ -1,0 +1,9 @@
+# compiled binaries — build locally, don't commit
+c/ping-sweep
+rust/ping-sweep
+go/ping-sweep
+*.o
+*.out
+
+# OS
+.DS_Store
