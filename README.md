@@ -38,9 +38,9 @@ Note: on a **live** network, single-probe (`-c 1`) sweeps are inherently non-det
 | Ruby | [`ruby/`](ruby/) | system `ping` | thread per host (`Thread.new`) | no | ✅ |
 | Nim | [`nim/`](nim/) | system `ping` | `execProcesses` (bounded pool of 64) | no | ✅ |
 
-**The C version is the odd one out, on purpose.** It opens an **unprivileged ICMP datagram socket** (`SOCK_DGRAM` + `IPPROTO_ICMP`) and speaks ICMP directly — build the echo request, checksum it, `connect()` to the target so replies are source-filtered, send, and match the reply by a per-host ICMP **id** (which keeps it correct even when many probes share one responder, as on loopback). The other seven lean on the system `ping` and instead show off their language's concurrency model. That contrast — *be the pinger* vs *orchestrate the pinger* — is the educational payload.
+**The C version is the odd one out, on purpose.** It opens an **unprivileged ICMP datagram socket** (`SOCK_DGRAM` + `IPPROTO_ICMP`) and speaks ICMP directly — build the echo request, checksum it, `connect()` to the target so replies are source-filtered, send, and match the reply by a per-host ICMP **id** (which keeps it correct even when many probes share one responder, as on loopback). The other nine lean on an external prober and instead show off their language's concurrency model. That contrast — *be the pinger* vs *orchestrate the pinger* — is the educational payload.
 
-> **Platform note (C only):** verified on macOS. Unprivileged datagram-ICMP works without root on macOS, and on Linux only when `net.ipv4.ping_group_range` includes your gid (not always the default); on Linux the kernel also assigns the ICMP id itself, so the id-match would need to read the kernel-assigned value via `getsockname`. The other seven are portable as-is.
+> **Platform note (C only):** verified on macOS. Unprivileged datagram-ICMP works without root on macOS, and on Linux only when `net.ipv4.ping_group_range` includes your gid (not always the default); on Linux the kernel also assigns the ICMP id itself, so the id-match would need to read the kernel-assigned value via `getsockname`. The other nine are portable as-is.
 
 ## Running
 
