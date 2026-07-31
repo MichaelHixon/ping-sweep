@@ -2,6 +2,7 @@
 c/ping-sweep
 rust/ping-sweep
 go/ping-sweep
+nim/ping-sweep
 *.o
 *.out
 
