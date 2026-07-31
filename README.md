@@ -21,6 +21,8 @@ ping-sweep <network>
 
 Keeping the contract identical is the point: the interesting differences are in *how* each language gets there, not *what* it does. All eight agree on the same target — verified on macOS against loopback, where only `127.0.0.1` answers. (On Linux the whole `127.0.0.0/8` is loopback and every address replies, so a loopback sweep there reports 254 — compare them on a real network instead.)
 
+Note: on a **live** network, single-probe (`-c 1`) sweeps are inherently non-deterministic — devices sleep and wake between probes, so two implementations may disagree by a host or two from run to run. That jitter is the network, not the code; only the loopback comparison is fully deterministic.
+
 ## Implementations
 
 | Language | Dir | Probe method | Concurrency model | Root | Status |

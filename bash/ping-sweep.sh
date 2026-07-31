@@ -27,7 +27,7 @@ tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
 
 for i in {1..254}; do
-  # each subshell appends one short line via O_APPEND; short writes don't interleave
+  # each subshell appends one short line; short O_APPEND writes (< PIPE_BUF) are atomic on POSIX
   ( ping -c 1 "${wait_flag[@]}" -- "$base.$i" >/dev/null 2>&1 && echo "$base.$i" >> "$tmp" ) &
 done
 wait

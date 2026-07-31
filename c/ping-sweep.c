@@ -53,7 +53,7 @@ static void *probe(void *arg) {
     pkt.seq  = htons(1);
     pkt.cksum = checksum(&pkt, sizeof(pkt));
 
-    if (send(fd, &pkt, sizeof(pkt), 0) > 0) {
+    if (send(fd, &pkt, sizeof(pkt), 0) == (ssize_t)sizeof(pkt)) {  /* full packet sent, else host stays down */
         uint8_t buf[128];
         for (;;) {
             ssize_t n = recv(fd, buf, sizeof(buf), 0);
