@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(./**)",
+      "Glob(./**)",
+      "Grep(./**)",
+      "Bash(cc -O2 -pthread c/ping-sweep.c:*)",
+      "Bash(rustc -O rust/ping-sweep.rs:*)",
+      "Bash(nim c:*)",
+      "Bash(go build:*)",
+      "Bash(go vet:*)",
+      "Bash(shellcheck:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)"
+    ],
+    "ask": [
+      "Bash(perl perl/ping-sweep.pl:*)",
+      "Bash(python3 python/ping-sweep.py:*)",
+      "Bash(bash bash/ping-sweep.sh:*)",
+      "Bash(bun typescript/ping-sweep.ts:*)",
+      "Bash(pwsh powershell/ping-sweep.ps1:*)",
+      "Bash(ruby ruby/ping-sweep.rb:*)",
+      "Bash(go run:*)",
+      "Bash(git push:*)",
+      "Bash(gh:*)"
+    ]
+  }
+}

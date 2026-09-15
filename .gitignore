@@ -8,3 +8,9 @@ nim/ping-sweep
 
 # OS
 .DS_Store
+
+# Claude Code local config — machine-local settings stay out.
+# settings.json is the exception: shared build/test permissions, no paths, no identity.
+# The /* form is required: git cannot re-include a file under an excluded directory.
+.claude/*
+!.claude/settings.json
