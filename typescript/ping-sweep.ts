@@ -23,8 +23,7 @@ const base = octets.slice(0, 3).join(".");
 const wait = process.platform === "darwin" ? ["-W", "1000"] : ["-W", "1"];
 const hosts = Array.from({ length: 254 }, (_, i) => `${base}.${i + 1}`);
 
-const key = (ip: string) => ip.split(".").reduce((n, o) => n * 256 + Number(o), 0);
-
+// Promise.all resolves in input order, so results come back sorted by host.
 const results = await Promise.all(
   hosts.map(async (ip) => {
     const proc = Bun.spawn(["ping", "-c", "1", ...wait, "--", ip], { stdout: "ignore", stderr: "ignore" });
@@ -32,6 +31,6 @@ const results = await Promise.all(
   }),
 );
 
-const up = results.filter((x): x is string => x !== null).sort((a, b) => key(a) - key(b));
+const up = results.filter((x): x is string => x !== null);
 for (const ip of up) console.log(ip);
 console.error(`${up.length} host${up.length === 1 ? "" : "s"} up on ${base}.0/24`);

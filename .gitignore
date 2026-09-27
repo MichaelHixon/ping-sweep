@@ -14,3 +14,6 @@ nim/ping-sweep
 # The /* form is required: git cannot re-include a file under an excluded directory.
 .claude/*
 !.claude/settings.json
+
+# Python bytecode
+__pycache__/

@@ -18,37 +18,31 @@ unless (defined $network) {
 # accept 192.168.1.0/24, 192.168.1.0, or 192.168.1 -> base "192.168.1"
 $network =~ s{/\d+$}{};
 my @octets = split /\./, $network;
-my $bad = @octets < 3;
-unless ($bad) {
-    for my $o (@octets[0 .. 2]) {
-        if ($o !~ /^\d{1,3}$/ || $o > 255) { $bad = 1; last; }
-    }
-}
+my $bad = @octets < 3 || grep { !/^\d{1,3}$/ || $_ > 255 } @octets[0 .. 2];
 if ($bad) { warn "invalid network: $network\n"; exit 1; }    # exit 1, matching the family
 my $base = join('.', @octets[0 .. 2]);
 
 # macOS `ping -W` is milliseconds; Linux `-W` is seconds.
 my @wait = ($^O eq 'darwin') ? ('-W', '1000') : ('-W', '1');
 
-my %ip_of;
+my %host_of;
 for my $host (1 .. 254) {
-    my $ip  = "$base.$host";
     my $pid = fork();
     if (!defined $pid) { warn "fork failed: $!\n"; next; }
     if ($pid == 0) {
         open(STDOUT, '>', '/dev/null');
         open(STDERR, '>', '/dev/null');
-        exec('ping', '-c', '1', @wait, '--', $ip);
+        exec('ping', '-c', '1', @wait, '--', "$base.$host");
         exit 1;    # exec only returns on failure
     }
-    $ip_of{$pid} = $ip;
+    $host_of{$pid} = $host;
 }
 
+# wait() returns in completion order; every host shares $base, so sort by host number
 my @up;
 while ((my $pid = wait()) > 0) {
-    push @up, $ip_of{$pid} if defined $ip_of{$pid} && $? == 0;
+    push @up, $host_of{$pid} if defined $host_of{$pid} && $? == 0;
 }
 
-print "$_\n"
-  for sort { pack('C4', split /\./, $a) cmp pack('C4', split /\./, $b) } @up;
+print "$base.$_\n" for sort { $a <=> $b } @up;
 printf STDERR "%d host%s up on %s.0/24\n", scalar(@up), (@up == 1 ? '' : 's'), $base;

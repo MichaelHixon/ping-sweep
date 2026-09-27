@@ -7,7 +7,6 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 #include <stdint.h>
 #include <pthread.h>
@@ -74,44 +73,29 @@ static void *probe(void *arg) {
     return NULL;
 }
 
-static uint32_t ipkey(const char *ip) {
-    unsigned a, b, c, d; sscanf(ip, "%u.%u.%u.%u", &a, &b, &c, &d);
-    return (a << 24) | (b << 16) | (c << 8) | d;
-}
-
 int main(int argc, char **argv) {
     if (argc < 2) {
         fprintf(stderr, "usage: ping-sweep <network>   e.g. 192.168.1.0/24 or 192.168.1\n");
         return 2;
     }
-    char net[64];
-    strncpy(net, argv[1], sizeof(net) - 1); net[sizeof(net) - 1] = 0;
-    char *slash = strchr(net, '/'); if (slash) *slash = 0;
-
-    unsigned a, b, c;
-    if (sscanf(net, "%u.%u.%u", &a, &b, &c) < 3 || a > 255 || b > 255 || c > 255) {
+    unsigned a, b, c;   /* sscanf stops at the '/' of a trailing /24 */
+    if (sscanf(argv[1], "%u.%u.%u", &a, &b, &c) < 3 || a > 255 || b > 255 || c > 255) {
         fprintf(stderr, "invalid network: %s\n", argv[1]); return 1;
     }
     char base[32]; snprintf(base, sizeof(base), "%u.%u.%u", a, b, c);
 
-    struct job jobs[254];
+    struct job jobs[254] = {0};
     pthread_t th[254];
     for (int i = 0; i < 254; i++) {
         snprintf(jobs[i].ip, sizeof(jobs[i].ip), "%s.%d", base, i + 1);
         jobs[i].host = i + 1;
-        jobs[i].up = 0;
         pthread_create(&th[i], NULL, probe, &jobs[i]);
     }
     for (int i = 0; i < 254; i++) pthread_join(th[i], NULL);
 
-    const char *up[254]; int nup = 0;
-    for (int i = 0; i < 254; i++) if (jobs[i].up) up[nup++] = jobs[i].ip;
-    for (int i = 1; i < nup; i++) {                 /* insertion sort by numeric IP */
-        const char *k = up[i]; int jx = i - 1;
-        while (jx >= 0 && ipkey(up[jx]) > ipkey(k)) { up[jx + 1] = up[jx]; jx--; }
-        up[jx + 1] = k;
-    }
-    for (int i = 0; i < nup; i++) printf("%s\n", up[i]);
+    int nup = 0;   /* jobs[] is indexed by host, so walking it prints in order */
+    for (int i = 0; i < 254; i++)
+        if (jobs[i].up) { printf("%s\n", jobs[i].ip); nup++; }
     fprintf(stderr, "%d host%s up on %s.0/24\n", nup, nup == 1 ? "" : "s", base);
     return 0;
 }

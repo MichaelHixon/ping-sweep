@@ -10,21 +10,22 @@
 #
 #     ping-sweep.rb <network>     # 192.168.1.0/24  or  192.168.1
 
+# macOS `ping -W` is milliseconds; Linux `-W` is seconds.
+WAIT = (RUBY_PLATFORM.include?("darwin") ? %w[-W 1000] : %w[-W 1]).freeze
+
 # "192.168.1.0/24" | "192.168.1.0" | "192.168.1"  ->  "192.168.1"
 def parse_base(arg)
   octets = arg.split("/").first.to_s.split(".")
   ok = octets.length >= 3 &&
-       octets[0, 3].all? { |o| o.match?(/\A\d{1,3}\z/) && (0..255).cover?(o.to_i) }
+       octets[0, 3].all? { |o| o.match?(/\A\d{1,3}\z/) && o.to_i <= 255 }
   raise ArgumentError, "invalid network: #{arg}" unless ok
 
   octets[0, 3].join(".")
 end
 
 def alive?(ip)
-  # macOS `ping -W` is milliseconds; Linux `-W` is seconds.
-  wait = RUBY_PLATFORM.include?("darwin") ? %w[-W 1000] : %w[-W 1]
   # Array form (no shell) — the validated `ip` never reaches a shell.
-  system("ping", "-c", "1", *wait, "--", ip, out: File::NULL, err: File::NULL)
+  system("ping", "-c", "1", *WAIT, "--", ip, out: File::NULL, err: File::NULL)
 end
 
 def main
@@ -40,12 +41,12 @@ def main
     exit 1
   end
 
+  # joining threads in creation order keeps `up` sorted by host
   hosts = (1..254).map { |i| "#{base}.#{i}" }
-  up = hosts.map { |ip| Thread.new(ip) { |h| alive?(h) ? h : nil } }
+  up = hosts.map { |ip| Thread.new { ip if alive?(ip) } }
             .map(&:value)
             .compact
 
-  up.sort_by! { |ip| ip.split(".").map(&:to_i) }
   puts up
   n = up.length
   warn "#{n} host#{'s' unless n == 1} up on #{base}.0/24"

@@ -11,33 +11,18 @@
 ## Build (source is ping_sweep.nim — Nim module names can't contain '-'):
 ##     nim c -d:release --out:ping-sweep ping_sweep.nim
 
-import std/[os, osproc, strutils, algorithm]
+import std/[os, osproc, strutils, sequtils]
 
 const Workers = 64   # bound concurrency (still finishes a /24 in a handful of timeouts)
 
 # "192.168.1.0/24" | "192.168.1.0" | "192.168.1"  ->  "192.168.1"
 proc parseBase(arg: string): string =
   let octets = arg.split('/')[0].split('.')
-  var ok = octets.len >= 3
-  if ok:
-    for o in octets[0 .. 2]:
-      if o.len notin 1 .. 3 or not o.allCharsInSet(Digits) or o.parseInt notin 0 .. 255:
-        ok = false
-        break
+  let ok = octets.len >= 3 and octets[0 .. 2].allIt(
+    it.len in 1 .. 3 and it.allCharsInSet(Digits) and it.parseInt <= 255)
   if not ok:
     raise newException(ValueError, "invalid network: " & arg)
   octets[0 .. 2].join(".")
-
-# numeric dotted-quad ordering (so .10 sorts after .9, not before).
-# Inputs are always validated 4-octet numeric strings here (base is validated,
-# `.$i` is an int), so parseInt on each octet is safe by construction.
-proc ipLess(a, b: string): int =
-  let pa = a.split('.')
-  let pb = b.split('.')
-  for k in 0 .. 3:
-    let c = cmp(pa[k].parseInt, pb[k].parseInt)
-    if c != 0: return c
-  0
 
 proc main() =
   if paramCount() < 1:
@@ -54,29 +39,29 @@ proc main() =
   # macOS `ping -W` is milliseconds; Linux `-W` is seconds.
   let wait = when defined(macosx): "-W 1000" else: "-W 1"
 
-  var hosts: seq[string]
   var cmds: seq[string]
   for i in 1 .. 254:
-    let ip = base & "." & $i
-    hosts.add(ip)
-    # `ip` is a validated dotted-quad (digits and dots only) — safe to place in a
+    # base is a validated dotted-quad (digits and dots only) — safe to place in a
     # shell command; there are no metacharacters it could carry.
-    cmds.add("ping -c 1 " & wait & " -- " & ip & " >/dev/null 2>&1")
+    cmds.add("ping -c 1 " & wait & " -- " & base & "." & $i & " >/dev/null 2>&1")
 
-  var up: seq[string]
+  # cmds[idx] probes host idx+1; walking `alive` in order prints hosts sorted.
+  # afterRunEvent runs on this thread (execProcesses polls its children), so no race.
+  var alive: array[254, bool]
   discard execProcesses(
     cmds,
     options = {poEvalCommand, poUsePath},
     n = Workers,
     afterRunEvent = proc(idx: int, p: Process) =
       if p.peekExitCode == 0:
-        up.add(hosts[idx]),
+        alive[idx] = true,
   )
 
-  up.sort(ipLess)
-  for ip in up:
-    echo ip
-  let n = up.len
+  var n = 0
+  for idx, isUp in alive:
+    if isUp:
+      echo base & "." & $(idx + 1)
+      inc n
   stderr.writeLine($n & " host" & (if n == 1: "" else: "s") & " up on " & base & ".0/24")
 
 main()

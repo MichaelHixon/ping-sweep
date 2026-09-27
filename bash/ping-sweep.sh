@@ -23,16 +23,19 @@ base="$a.$b.$c"
 # macOS `ping -W` is milliseconds; Linux `-W` is seconds.
 if [[ "$(uname)" == "Darwin" ]]; then wait_flag=(-W 1000); else wait_flag=(-W 1); fi
 
-tmp="$(mktemp)"
-trap 'rm -f "$tmp"' EXIT
-
+pids=()
 for i in {1..254}; do
-  # each subshell appends one short line; short O_APPEND writes (< PIPE_BUF) are atomic on POSIX
-  ( ping -c 1 "${wait_flag[@]}" -- "$base.$i" >/dev/null 2>&1 && echo "$base.$i" >> "$tmp" ) &
+  ping -c 1 "${wait_flag[@]}" -- "$base.$i" >/dev/null 2>&1 &
+  pids[i]=$!
 done
-wait
 
-sort -t. -k1,1n -k2,2n -k3,3n -k4,4n "$tmp"
-count="$(wc -l < "$tmp" | tr -d ' ')"
+# reap each job in host order: its exit status says up/down, and the output comes out sorted
+count=0
+for i in {1..254}; do
+  if wait "${pids[i]}"; then
+    echo "$base.$i"
+    count=$((count + 1))
+  fi
+done
 s=s; [[ "$count" -eq 1 ]] && s=
 echo "$count host$s up on $base.0/24" >&2
