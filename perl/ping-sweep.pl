@@ -16,9 +16,9 @@ unless (defined $network) {
 }
 
 # accept 192.168.1.0/24, 192.168.1.0, or 192.168.1 -> base "192.168.1"
-$network =~ s{/\d+$}{};
-my @octets = split /\./, $network;
-my $bad = @octets < 3 || grep { !/^\d{1,3}$/ || $_ > 255 } @octets[0 .. 2];
+(my $net = $network) =~ s{/.*}{}s;    # ignore everything after a '/', like the rest of the family
+my @octets = split /\./, $net;
+my $bad = @octets < 3 || grep { !/\A[0-9]{1,3}\z/ || $_ > 255 } @octets[0 .. 2];
 if ($bad) { warn "invalid network: $network\n"; exit 1; }    # exit 1, matching the family
 # rebuild from the numeric values: `ping` would read a leading-zero "010" as octal 8
 my $base = join('.', map { $_ + 0 } @octets[0 .. 2]);

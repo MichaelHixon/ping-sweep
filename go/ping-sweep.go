@@ -26,9 +26,10 @@ func main() {
 	var n [3]int
 	valid := len(octets) >= 3
 	for i := 0; valid && i < 3; i++ {
-		v, err := strconv.Atoi(octets[i])
-		valid = err == nil && v >= 0 && v <= 255
-		n[i] = v
+		// base 10, bitSize 8: rejects a sign and anything over 255; len rejects "0010"
+		v, err := strconv.ParseUint(octets[i], 10, 8)
+		valid = err == nil && len(octets[i]) <= 3
+		n[i] = int(v)
 	}
 	if !valid {
 		fmt.Fprintf(os.Stderr, "invalid network: %s\n", os.Args[1])

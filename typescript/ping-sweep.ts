@@ -6,7 +6,7 @@
 //     bun typescript/ping-sweep.ts <network>     # 192.168.1.0/24  or  192.168.1
 
 const arg = process.argv[2];
-if (!arg) {
+if (arg === undefined) {  // an empty-string argument is invalid (exit 1), not missing
   console.error("usage: ping-sweep.ts <network>   e.g. 192.168.1.0/24 or 192.168.1");
   process.exit(2);
 }

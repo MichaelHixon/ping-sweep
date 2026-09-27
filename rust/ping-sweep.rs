@@ -11,16 +11,23 @@ use std::sync::mpsc;
 use std::thread;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
+    // args_os: env::args() panics on an argument that isn't valid UTF-8
+    let Some(raw) = env::args_os().nth(1) else {
         eprintln!("usage: ping-sweep <network>   e.g. 192.168.1.0/24 or 192.168.1");
         std::process::exit(2);
-    }
-    let net = args[1].split('/').next().unwrap();
-    // u8 does the 0–255 range check; a bad or missing octet leaves fewer than 3
-    let nums: Vec<u8> = net.split('.').take(3).filter_map(|o| o.parse().ok()).collect();
+    };
+    let arg = raw.to_string_lossy();   // non-UTF-8 bytes become U+FFFD, which fails validation
+    let net = arg.split('/').next().unwrap();
+    // 1–3 ASCII digits (parse alone would also accept "+1" and "0010"), and u8 does
+    // the 0–255 range check; a bad or missing octet leaves fewer than 3
+    let nums: Vec<u8> = net
+        .split('.')
+        .take(3)
+        .filter(|o| o.len() <= 3 && o.bytes().all(|b| b.is_ascii_digit()))
+        .filter_map(|o| o.parse().ok())
+        .collect();
     if nums.len() < 3 {
-        eprintln!("invalid network: {}", args[1]);
+        eprintln!("invalid network: {}", arg);
         std::process::exit(1);
     }
     // rebuild from the numeric values: `ping` would read a leading-zero "010" as octal 8

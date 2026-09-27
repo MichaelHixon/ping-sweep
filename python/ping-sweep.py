@@ -7,6 +7,7 @@ the same on macOS and Linux. Same contract as every other script in this repo:
     ping-sweep.py <network>     # 192.168.1.0/24  or  192.168.1
 """
 import platform
+import re
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -18,7 +19,9 @@ WAIT = ["-W", "1000"] if platform.system() == "Darwin" else ["-W", "1"]
 def parse_base(arg: str) -> str:
     """192.168.1.0/24 | 192.168.1.0 | 192.168.1  ->  '192.168.1'"""
     octets = arg.split("/")[0].split(".")
-    if len(octets) < 3 or not all(o.isdigit() and int(o) <= 255 for o in octets[:3]):
+    if len(octets) < 3 or not all(
+        re.fullmatch("[0-9]{1,3}", o) and int(o) <= 255 for o in octets[:3]
+    ):
         raise ValueError(f"invalid network: {arg}")
     # rebuild from the numeric values: `ping` would read a leading-zero "010" as octal 8
     return ".".join(str(int(o)) for o in octets[:3])

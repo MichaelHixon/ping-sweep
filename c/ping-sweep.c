@@ -7,6 +7,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <stdint.h>
 #include <pthread.h>
@@ -73,13 +74,25 @@ static void *probe(void *arg) {
     return NULL;
 }
 
+/* Strict octet: 1-3 ASCII digits, value <= 255; advances *s past it.
+ * (sscanf "%u" would also accept "+1", leading spaces, "0010" and trailing junk.) */
+static int octet(const char **s, unsigned *v) {
+    size_t n = strspn(*s, "0123456789");
+    if (n < 1 || n > 3) return 0;
+    *v = (unsigned)strtoul(*s, NULL, 10);
+    *s += n;
+    return *v <= 255;
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
         fprintf(stderr, "usage: ping-sweep <network>   e.g. 192.168.1.0/24 or 192.168.1\n");
         return 2;
     }
-    unsigned a, b, c;   /* sscanf stops at the '/' of a trailing /24 */
-    if (sscanf(argv[1], "%u.%u.%u", &a, &b, &c) < 3 || a > 255 || b > 255 || c > 255) {
+    /* three octets, then end of string, a fourth octet, or a /suffix (both ignored) */
+    unsigned a, b, c; const char *p = argv[1];
+    if (!(octet(&p, &a) && *p++ == '.' && octet(&p, &b) && *p++ == '.' && octet(&p, &c)
+          && (*p == '\0' || *p == '.' || *p == '/'))) {
         fprintf(stderr, "invalid network: %s\n", argv[1]); return 1;
     }
     char base[32]; snprintf(base, sizeof(base), "%u.%u.%u", a, b, c);

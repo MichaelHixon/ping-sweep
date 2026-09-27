@@ -4,18 +4,21 @@
 # Uses Test-Connection with ForEach-Object -Parallel (PowerShell 7+). Same
 # contract as the rest of the repo:
 #     pwsh powershell/ping-sweep.ps1 <network>     # 192.168.1.0/24  or  192.168.1
-param([string]$Network)
-
-if (-not $Network) {
+# Plain $args, no param block: a named [string] param would swallow "-0.1.2" as a
+# parameter name and couldn't tell "" from a missing argument, and a [Parameter()]
+# attribute would make this an advanced script that claims -Verbose, -ea, -? …
+if ($args.Count -lt 1) {
     [Console]::Error.WriteLine('usage: ping-sweep.ps1 <network>   e.g. 192.168.1.0/24 or 192.168.1')
     exit 2
 }
+$Network = [string]$args[0]
 
 $octets = ($Network -split '/')[0] -split '\.'
 $valid = $octets.Count -ge 3
 if ($valid) {
     foreach ($o in $octets[0..2]) {
-        if ($o -notmatch '^\d{1,3}$' -or [int]$o -gt 255) { $valid = $false; break }
+        # [0-9], not \d (also matches '١'); \z, not $ (also matches before a trailing newline)
+        if ($o -notmatch '^[0-9]{1,3}\z' -or [int]$o -gt 255) { $valid = $false; break }
     }
 }
 if (-not $valid) {

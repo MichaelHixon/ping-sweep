@@ -12,14 +12,15 @@ if [[ $# -lt 1 ]]; then
 fi
 
 net="${1%%/*}"                    # strip a trailing /24
-IFS='.' read -r a b c _ <<< "$net"
-valid_octet() { [[ "$1" =~ ^[0-9]{1,3}$ ]] && (( 10#$1 <= 255 )); }
-if ! valid_octet "${a:-}" || ! valid_octet "${b:-}" || ! valid_octet "${c:-}"; then
+# one regex over the whole string (`read` would stop at an embedded newline);
+# a fourth octet, if present, is ignored
+if [[ ! "$net" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})(\..*)?$ ]] ||
+   (( 10#${BASH_REMATCH[1]} > 255 || 10#${BASH_REMATCH[2]} > 255 || 10#${BASH_REMATCH[3]} > 255 )); then
   echo "invalid network: $1" >&2
   exit 1
 fi
 # rebuild from the numeric values: `ping` would read a leading-zero "010" as octal 8
-base="$((10#$a)).$((10#$b)).$((10#$c))"
+base="$((10#${BASH_REMATCH[1]})).$((10#${BASH_REMATCH[2]})).$((10#${BASH_REMATCH[3]}))"
 
 # macOS `ping -W` is milliseconds; Linux `-W` is seconds.
 if [[ "$(uname)" == "Darwin" ]]; then wait_flag=(-W 1000); else wait_flag=(-W 1); fi
