@@ -11,10 +11,16 @@ if (arg === undefined) {  // an empty-string argument is invalid (exit 1), not m
   process.exit(2);
 }
 
-const octets = arg.split("/")[0].split(".");
+// indexOf, not split("/", 2): JS split drops the remainder, so "/24/24" would pass
+const slash = arg.indexOf("/");
+const octets = (slash < 0 ? arg : arg.slice(0, slash)).split(".");
 const validOctet = (o: string) => /^\d{1,3}$/.test(o) && Number(o) <= 255;
-if (octets.length < 3 || !octets.slice(0, 3).every(validOctet)) {
+if ((octets.length !== 3 && octets.length !== 4) || !octets.every(validOctet)) {
   console.error(`invalid network: ${arg}`);
+  process.exit(1);
+}
+if (slash >= 0 && arg.slice(slash + 1) !== "24") {
+  console.error(`invalid network: ${arg} (only /24 is supported)`);
   process.exit(1);
 }
 // rebuild from the numeric values: `ping` would read a leading-zero "010" as octal 8

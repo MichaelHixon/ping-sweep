@@ -12,11 +12,12 @@ Every implementation honors the same interface and behavior:
 ping-sweep <network>
 ```
 
-- `<network>` accepts `192.168.1.0/24`, `192.168.1.0`, or just `192.168.1` — the first three octets are what matter.
+- `<network>` accepts `192.168.1`, or a full address like `192.168.1.0` or `192.168.1.50` (any valid fourth octet; only the first three matter), optionally followed by `/24`.
 - Sweeps host octets `.1` through `.254`, **concurrently**.
 - Prints each live host as a full IP, one per line, to **stdout** (sorted).
 - Prints a one-line summary (`N hosts up on …`) to **stderr**.
-- Each of the first three octets must be 1–3 decimal digits (`0-9` only: no sign, no spaces) with a value in `0–255`; anything else, including an empty argument, → `invalid network`, exit code `1`. Anything after a `/`, and any fourth octet, is ignored.
+- Every octet must be 1–3 decimal digits (`0-9` only: no sign, no spaces) with a value in `0–255`, and there are three or four of them; anything else, including an empty argument, → `invalid network: <arg>`, exit code `1`.
+- An otherwise valid network with any suffix other than exactly `/24` → `invalid network: <arg> (only /24 is supported)`, exit code `1`. The tool always sweeps a /24, so it refuses rather than quietly sweep a different range than the one asked for.
 - Octets are decimal: a leading zero is dropped (`10.010.1` sweeps `10.10.1.0/24`), never passed through for `ping` to read as octal (`010` → 8).
 - No argument → usage message, exit code `2`.
   (Two runtime quirks sit outside the scripts' reach: `bun` consumes a bare `--`, so the TypeScript version sees no argument; `pwsh` splits `-name:value` into two arguments, so its error echoes only `-name`. Both still refuse to sweep.)

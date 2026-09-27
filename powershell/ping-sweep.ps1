@@ -13,16 +13,22 @@ if ($args.Count -lt 1) {
 }
 $Network = [string]$args[0]
 
-$octets = ($Network -split '/')[0] -split '\.'
-$valid = $octets.Count -ge 3
+$net, $suffix = $Network -split '/', 2
+$octets = $net -split '\.'
+$valid = $octets.Count -in 3, 4   # a fourth octet is validated, but its value ignored
 if ($valid) {
-    foreach ($o in $octets[0..2]) {
+    foreach ($o in $octets) {
         # [0-9], not \d (also matches '١'); \z, not $ (also matches before a trailing newline)
         if ($o -notmatch '^[0-9]{1,3}\z' -or [int]$o -gt 255) { $valid = $false; break }
     }
 }
 if (-not $valid) {
     [Console]::Error.WriteLine("invalid network: $Network")
+    exit 1
+}
+# ordinal: -ne/-cne compare culture-aware, so "2<U+200B>4" would equal "24"
+if ($null -ne $suffix -and -not [string]::Equals($suffix, '24', [StringComparison]::Ordinal)) {
+    [Console]::Error.WriteLine("invalid network: $Network (only /24 is supported)")
     exit 1
 }
 # rebuild from the numeric values: a leading-zero "010" would otherwise be read as octal 8

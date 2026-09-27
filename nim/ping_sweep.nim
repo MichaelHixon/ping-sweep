@@ -15,13 +15,17 @@ import std/[os, osproc, strutils, sequtils]
 
 const Workers = 64   # bound concurrency (still finishes a /24 in a handful of timeouts)
 
-# "192.168.1.0/24" | "192.168.1.0" | "192.168.1"  ->  "192.168.1"
+# "192.168.1" | "192.168.1.<0-255>", optionally + "/24"  ->  "192.168.1"
 proc parseBase(arg: string): string =
-  let octets = arg.split('/')[0].split('.')
-  let ok = octets.len >= 3 and octets[0 .. 2].allIt(
+  let parts = arg.split('/', maxsplit = 1)
+  let octets = parts[0].split('.')
+  # 3 or 4 octets; a fourth is validated but its value ignored
+  let ok = octets.len in 3 .. 4 and octets.allIt(
     it.len in 1 .. 3 and it.allCharsInSet(Digits) and it.parseInt <= 255)
   if not ok:
     raise newException(ValueError, "invalid network: " & arg)
+  if parts.len == 2 and parts[1] != "24":
+    raise newException(ValueError, "invalid network: " & arg & " (only /24 is supported)")
   # rebuild from the numeric values: `ping` would read a leading-zero "010" as octal 8
   octets[0 .. 2].mapIt($it.parseInt).join(".")
 

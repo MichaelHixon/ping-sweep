@@ -22,10 +22,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, "usage: ping-sweep <network>   e.g. 192.168.1.0/24 or 192.168.1")
 		os.Exit(2)
 	}
-	octets := strings.Split(strings.Split(os.Args[1], "/")[0], ".")
-	var n [3]int
-	valid := len(octets) >= 3
-	for i := 0; valid && i < 3; i++ {
+	prefix, suffix, hasSlash := strings.Cut(os.Args[1], "/")
+	octets := strings.Split(prefix, ".")
+	var n [4]int // an optional fourth octet is validated, but its value is ignored
+	valid := len(octets) == 3 || len(octets) == 4
+	for i := 0; valid && i < len(octets); i++ {
 		// base 10, bitSize 8: rejects a sign and anything over 255; len rejects "0010"
 		v, err := strconv.ParseUint(octets[i], 10, 8)
 		valid = err == nil && len(octets[i]) <= 3
@@ -33,6 +34,10 @@ func main() {
 	}
 	if !valid {
 		fmt.Fprintf(os.Stderr, "invalid network: %s\n", os.Args[1])
+		os.Exit(1)
+	}
+	if hasSlash && suffix != "24" {
+		fmt.Fprintf(os.Stderr, "invalid network: %s (only /24 is supported)\n", os.Args[1])
 		os.Exit(1)
 	}
 	// rebuild from the numeric values: `ping` would read a leading-zero "010" as octal 8

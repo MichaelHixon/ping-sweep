@@ -16,18 +16,26 @@ fn main() {
         eprintln!("usage: ping-sweep <network>   e.g. 192.168.1.0/24 or 192.168.1");
         std::process::exit(2);
     };
-    let arg = raw.to_string_lossy();   // non-UTF-8 bytes become U+FFFD, which fails validation
-    let net = arg.split('/').next().unwrap();
-    // 1–3 ASCII digits (parse alone would also accept "+1" and "0010"), and u8 does
-    // the 0–255 range check; a bad or missing octet leaves fewer than 3
-    let nums: Vec<u8> = net
-        .split('.')
-        .take(3)
-        .filter(|o| o.len() <= 3 && o.bytes().all(|b| b.is_ascii_digit()))
-        .filter_map(|o| o.parse().ok())
+    let arg = raw.to_string_lossy(); // non-UTF-8 bytes become U+FFFD, which fails validation
+    let mut parts = arg.splitn(2, '/');
+    let net = parts.next().unwrap();
+    let suffix = parts.next();
+    // 3 or 4 octets of 1–3 ASCII digits (parse alone would also accept "+1" and
+    // "0010"); u8 does the 0–255 range check. splitn(5) bounds the work.
+    let nums: Option<Vec<u8>> = net
+        .splitn(5, '.')
+        .map(|o| {
+            o.parse()
+                .ok()
+                .filter(|_| o.len() <= 3 && o.bytes().all(|b| b.is_ascii_digit()))
+        })
         .collect();
-    if nums.len() < 3 {
+    let Some(nums) = nums.filter(|n| (3..=4).contains(&n.len())) else {
         eprintln!("invalid network: {}", arg);
+        std::process::exit(1);
+    };
+    if suffix.is_some_and(|s| s != "24") {
+        eprintln!("invalid network: {} (only /24 is supported)", arg);
         std::process::exit(1);
     }
     // rebuild from the numeric values: `ping` would read a leading-zero "010" as octal 8
@@ -46,9 +54,11 @@ fn main() {
         let tx = tx.clone();
         thread::spawn(move || {
             let ok = Command::new("ping")
-                .arg("-c").arg("1")
+                .arg("-c")
+                .arg("1")
                 .args(wait)
-                .arg("--").arg(&ip)
+                .arg("--")
+                .arg(&ip)
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
                 .status()

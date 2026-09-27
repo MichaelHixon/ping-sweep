@@ -15,11 +15,15 @@ unless (defined $network) {
     exit 2;
 }
 
-# accept 192.168.1.0/24, 192.168.1.0, or 192.168.1 -> base "192.168.1"
-(my $net = $network) =~ s{/.*}{}s;    # ignore everything after a '/', like the rest of the family
-my @octets = split /\./, $net;
-my $bad = @octets < 3 || grep { !/\A[0-9]{1,3}\z/ || $_ > 255 } @octets[0 .. 2];
+# accept 192.168.1, 192.168.1.<0-255>, either with an optional /24 -> base "192.168.1"
+my ($net, $suffix) = split m{/}, $network, 2;
+my @octets = split /\./, $net // '', -1;    # -1 keeps a trailing empty field, so "1.2.3." fails
+my $bad = (@octets != 3 && @octets != 4) || grep { !/\A[0-9]{1,3}\z/ || $_ > 255 } @octets;
 if ($bad) { warn "invalid network: $network\n"; exit 1; }    # exit 1, matching the family
+if (defined $suffix && $suffix ne '24') {
+    warn "invalid network: $network (only /24 is supported)\n";
+    exit 1;
+}
 # rebuild from the numeric values: `ping` would read a leading-zero "010" as octal 8
 my $base = join('.', map { $_ + 0 } @octets[0 .. 2]);
 

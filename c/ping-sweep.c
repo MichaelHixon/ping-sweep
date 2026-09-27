@@ -89,11 +89,15 @@ int main(int argc, char **argv) {
         fprintf(stderr, "usage: ping-sweep <network>   e.g. 192.168.1.0/24 or 192.168.1\n");
         return 2;
     }
-    /* three octets, then end of string, a fourth octet, or a /suffix (both ignored) */
-    unsigned a, b, c; const char *p = argv[1];
-    if (!(octet(&p, &a) && *p++ == '.' && octet(&p, &b) && *p++ == '.' && octet(&p, &c)
-          && (*p == '\0' || *p == '.' || *p == '/'))) {
+    /* three octets, an optional fourth (validated, value ignored), then end or a /suffix */
+    unsigned a, b, c, d; const char *p = argv[1];
+    int ok = octet(&p, &a) && *p++ == '.' && octet(&p, &b) && *p++ == '.' && octet(&p, &c);
+    if (ok && *p == '.') { p++; ok = octet(&p, &d); }
+    if (!ok || (*p != '\0' && *p != '/')) {
         fprintf(stderr, "invalid network: %s\n", argv[1]); return 1;
+    }
+    if (*p == '/' && strcmp(p, "/24") != 0) {
+        fprintf(stderr, "invalid network: %s (only /24 is supported)\n", argv[1]); return 1;
     }
     char base[32]; snprintf(base, sizeof(base), "%u.%u.%u", a, b, c);
 

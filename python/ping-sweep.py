@@ -17,12 +17,15 @@ WAIT = ["-W", "1000"] if platform.system() == "Darwin" else ["-W", "1"]
 
 
 def parse_base(arg: str) -> str:
-    """192.168.1.0/24 | 192.168.1.0 | 192.168.1  ->  '192.168.1'"""
-    octets = arg.split("/")[0].split(".")
-    if len(octets) < 3 or not all(
-        re.fullmatch("[0-9]{1,3}", o) and int(o) <= 255 for o in octets[:3]
+    """192.168.1 | 192.168.1.<0-255>, optionally + /24  ->  '192.168.1'"""
+    net, slash, suffix = arg.partition("/")
+    octets = net.split(".")
+    if len(octets) not in (3, 4) or not all(
+        re.fullmatch("[0-9]{1,3}", o) and int(o) <= 255 for o in octets
     ):
         raise ValueError(f"invalid network: {arg}")
+    if slash and suffix != "24":
+        raise ValueError(f"invalid network: {arg} (only /24 is supported)")
     # rebuild from the numeric values: `ping` would read a leading-zero "010" as octal 8
     return ".".join(str(int(o)) for o in octets[:3])
 

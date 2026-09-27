@@ -11,12 +11,17 @@ if [[ $# -lt 1 ]]; then
   exit 2
 fi
 
-net="${1%%/*}"                    # strip a trailing /24
-# one regex over the whole string (`read` would stop at an embedded newline);
-# a fourth octet, if present, is ignored
-if [[ ! "$net" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})(\..*)?$ ]] ||
-   (( 10#${BASH_REMATCH[1]} > 255 || 10#${BASH_REMATCH[2]} > 255 || 10#${BASH_REMATCH[3]} > 255 )); then
+# one regex over the whole argument (`read` would stop at an embedded newline):
+# three octets, an optional fourth (validated, value ignored), an optional /suffix
+# BASH_REMATCH: [1..3] octets · [5] fourth octet · [6] "/suffix"
+if [[ ! "$1" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})(\.([0-9]{1,3}))?(/.*)?$ ]] ||
+   (( 10#${BASH_REMATCH[1]} > 255 || 10#${BASH_REMATCH[2]} > 255 || 10#${BASH_REMATCH[3]} > 255 ||
+      10#${BASH_REMATCH[5]:-0} > 255 )); then
   echo "invalid network: $1" >&2
+  exit 1
+fi
+if [[ -n ${BASH_REMATCH[6]} && ${BASH_REMATCH[6]} != /24 ]]; then
+  echo "invalid network: $1 (only /24 is supported)" >&2
   exit 1
 fi
 # rebuild from the numeric values: `ping` would read a leading-zero "010" as octal 8
