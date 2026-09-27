@@ -20,7 +20,8 @@ def parse_base(arg: str) -> str:
     octets = arg.split("/")[0].split(".")
     if len(octets) < 3 or not all(o.isdigit() and int(o) <= 255 for o in octets[:3]):
         raise ValueError(f"invalid network: {arg}")
-    return ".".join(octets[:3])
+    # rebuild from the numeric values: `ping` would read a leading-zero "010" as octal 8
+    return ".".join(str(int(o)) for o in octets[:3])
 
 
 def alive(ip: str) -> bool:

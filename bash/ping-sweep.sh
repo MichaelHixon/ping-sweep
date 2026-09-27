@@ -18,7 +18,8 @@ if ! valid_octet "${a:-}" || ! valid_octet "${b:-}" || ! valid_octet "${c:-}"; t
   echo "invalid network: $1" >&2
   exit 1
 fi
-base="$a.$b.$c"
+# rebuild from the numeric values: `ping` would read a leading-zero "010" as octal 8
+base="$((10#$a)).$((10#$b)).$((10#$c))"
 
 # macOS `ping -W` is milliseconds; Linux `-W` is seconds.
 if [[ "$(uname)" == "Darwin" ]]; then wait_flag=(-W 1000); else wait_flag=(-W 1); fi

@@ -23,20 +23,19 @@ func main() {
 		os.Exit(2)
 	}
 	octets := strings.Split(strings.Split(os.Args[1], "/")[0], ".")
+	var n [3]int
 	valid := len(octets) >= 3
-	if valid {
-		for _, o := range octets[:3] {
-			if n, err := strconv.Atoi(o); err != nil || n < 0 || n > 255 {
-				valid = false
-				break
-			}
-		}
+	for i := 0; valid && i < 3; i++ {
+		v, err := strconv.Atoi(octets[i])
+		valid = err == nil && v >= 0 && v <= 255
+		n[i] = v
 	}
 	if !valid {
 		fmt.Fprintf(os.Stderr, "invalid network: %s\n", os.Args[1])
 		os.Exit(1)
 	}
-	base := strings.Join(octets[:3], ".")
+	// rebuild from the numeric values: `ping` would read a leading-zero "010" as octal 8
+	base := fmt.Sprintf("%d.%d.%d", n[0], n[1], n[2])
 
 	// macOS `ping -W` is milliseconds; Linux `-W` is seconds.
 	timeout := "1"

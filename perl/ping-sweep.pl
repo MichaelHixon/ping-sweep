@@ -20,7 +20,8 @@ $network =~ s{/\d+$}{};
 my @octets = split /\./, $network;
 my $bad = @octets < 3 || grep { !/^\d{1,3}$/ || $_ > 255 } @octets[0 .. 2];
 if ($bad) { warn "invalid network: $network\n"; exit 1; }    # exit 1, matching the family
-my $base = join('.', @octets[0 .. 2]);
+# rebuild from the numeric values: `ping` would read a leading-zero "010" as octal 8
+my $base = join('.', map { $_ + 0 } @octets[0 .. 2]);
 
 # macOS `ping -W` is milliseconds; Linux `-W` is seconds.
 my @wait = ($^O eq 'darwin') ? ('-W', '1000') : ('-W', '1');

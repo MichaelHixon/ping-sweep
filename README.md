@@ -17,6 +17,7 @@ ping-sweep <network>
 - Prints each live host as a full IP, one per line, to **stdout** (sorted).
 - Prints a one-line summary (`N hosts up on …`) to **stderr**.
 - Each of the first three octets is validated as a number in `0–255`; anything else → `invalid network`, exit code `1`.
+- Octets are decimal: a leading zero is dropped (`10.010.1` sweeps `10.10.1.0/24`), never passed through for `ping` to read as octal (`010` → 8).
 - No argument → usage message, exit code `2`.
 
 Keeping the contract identical is the point: the interesting differences are in *how* each language gets there, not *what* it does. All ten agree on the same target — verified on macOS against loopback, where only `127.0.0.1` answers. (On Linux the whole `127.0.0.0/8` is loopback and every address replies, so a loopback sweep there reports 254 — compare them on a real network instead.)

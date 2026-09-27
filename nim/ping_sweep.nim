@@ -22,7 +22,8 @@ proc parseBase(arg: string): string =
     it.len in 1 .. 3 and it.allCharsInSet(Digits) and it.parseInt <= 255)
   if not ok:
     raise newException(ValueError, "invalid network: " & arg)
-  octets[0 .. 2].join(".")
+  # rebuild from the numeric values: `ping` would read a leading-zero "010" as octal 8
+  octets[0 .. 2].mapIt($it.parseInt).join(".")
 
 proc main() =
   if paramCount() < 1:

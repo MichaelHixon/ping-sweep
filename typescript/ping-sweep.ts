@@ -17,7 +17,8 @@ if (octets.length < 3 || !octets.slice(0, 3).every(validOctet)) {
   console.error(`invalid network: ${arg}`);
   process.exit(1);
 }
-const base = octets.slice(0, 3).join(".");
+// rebuild from the numeric values: `ping` would read a leading-zero "010" as octal 8
+const base = octets.slice(0, 3).map(Number).join(".");
 
 // macOS `ping -W` is milliseconds; Linux `-W` is seconds.
 const wait = process.platform === "darwin" ? ["-W", "1000"] : ["-W", "1"];

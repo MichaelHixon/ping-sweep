@@ -22,7 +22,8 @@ if (-not $valid) {
     [Console]::Error.WriteLine("invalid network: $Network")
     exit 1
 }
-$prefix = ($octets[0..2]) -join '.'
+# rebuild from the numeric values: a leading-zero "010" would otherwise be read as octal 8
+$prefix = [int[]]$octets[0..2] -join '.'
 
 # ThrottleLimit 64: PowerShell runspaces are heavier than OS threads, so we
 # sweep in waves of 64 rather than opening 254 at once.

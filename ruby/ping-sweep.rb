@@ -20,7 +20,8 @@ def parse_base(arg)
        octets[0, 3].all? { |o| o.match?(/\A\d{1,3}\z/) && o.to_i <= 255 }
   raise ArgumentError, "invalid network: #{arg}" unless ok
 
-  octets[0, 3].join(".")
+  # rebuild from the numeric values: `ping` would read a leading-zero "010" as octal 8
+  octets[0, 3].map(&:to_i).join(".")
 end
 
 def alive?(ip)

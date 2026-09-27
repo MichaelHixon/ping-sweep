@@ -17,14 +17,14 @@ fn main() {
         std::process::exit(2);
     }
     let net = args[1].split('/').next().unwrap();
-    let octets: Vec<&str> = net.split('.').collect();
-    let valid = octets.len() >= 3
-        && octets[..3].iter().all(|o| o.parse::<u16>().is_ok_and(|n| n <= 255));
-    if !valid {
+    // u8 does the 0–255 range check; a bad or missing octet leaves fewer than 3
+    let nums: Vec<u8> = net.split('.').take(3).filter_map(|o| o.parse().ok()).collect();
+    if nums.len() < 3 {
         eprintln!("invalid network: {}", args[1]);
         std::process::exit(1);
     }
-    let base = format!("{}.{}.{}", octets[0], octets[1], octets[2]);
+    // rebuild from the numeric values: `ping` would read a leading-zero "010" as octal 8
+    let base = format!("{}.{}.{}", nums[0], nums[1], nums[2]);
 
     // macOS `ping -W` is milliseconds; Linux `-W` is seconds.
     let wait: &'static [&'static str] = if cfg!(target_os = "macos") {
