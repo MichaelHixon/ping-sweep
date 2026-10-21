@@ -1,78 +1,106 @@
 # ping-sweep
 
-**One tool, ten languages.** A host-discovery sweep across a `/24`, implemented the idiomatic way in ten languages — a study in how each one tackles the same problem: parse a network, fan out 254 probes concurrently, collect the hosts that answer.
+A host-discovery sweep across a `/24`, written ten times in ten languages. Every version takes the same argument, prints the same output and exits with the same codes. That holds the problem constant, so the only thing left to compare is how each language fans out 254 probes and collects the answers. It started as a single Perl script in 2018.
 
-Revived from a 2018 one-file Perl script into the polyglot collection it was always meant to be.
+## Writeup
+
+- [Be the Pinger](https://michaelhixon.com/posts/be-the-pinger/): walks through the ten versions and what each one's concurrency looks like.
 
 ## The shared contract
-
-Every implementation honors the same interface and behavior:
 
 ```
 ping-sweep <network>
 ```
 
-- `<network>` accepts `192.168.1`, or a full address like `192.168.1.0` or `192.168.1.50` (any valid fourth octet; only the first three matter), optionally followed by `/24`.
-- Sweeps host octets `.1` through `.254`, **concurrently**.
-- Prints each live host as a full IP, one per line, to **stdout** (sorted).
-- Prints a one-line summary (`N hosts up on …`) to **stderr**.
-- Every octet must be 1–3 decimal digits (`0-9` only: no sign, no spaces) with a value in `0–255`, and there are three or four of them; anything else, including an empty argument, → `invalid network: <arg>`, exit code `1`.
-- An otherwise valid network with any suffix other than exactly `/24` → `invalid network: <arg> (only /24 is supported)`, exit code `1`. The tool always sweeps a /24, so it refuses rather than quietly sweep a different range than the one asked for.
-- Octets are decimal: a leading zero is dropped (`10.010.1` sweeps `10.10.1.0/24`), never passed through for `ping` to read as octal (`010` → 8).
-- No argument → usage message, exit code `2`.
-  (Two runtime quirks sit outside the scripts' reach: `bun` consumes a bare `--`, so the TypeScript version sees no argument; `pwsh` splits `-name:value` into two arguments, so its error echoes only `-name`. Both still refuse to sweep.)
+- `<network>` is three octets (`192.168.1`) or four (`192.168.1.0`, `192.168.1.50`), optionally followed by `/24`. A fourth octet is validated, then ignored: only the first three pick the network.
 
-Keeping the contract identical is the point: the interesting differences are in *how* each language gets there, not *what* it does. All ten agree on the same target — verified on macOS against loopback, where only `127.0.0.1` answers. (On Linux the whole `127.0.0.0/8` is loopback and every address replies, so a loopback sweep there reports 254 — compare them on a real network instead.)
+- Each octet is 1 to 3 ASCII digits with a value of 0 to 255. No sign, no spaces, no empty field.
 
-Note: on a **live** network, single-probe (`-c 1`) sweeps are inherently non-deterministic — devices sleep and wake between probes, so two implementations may disagree by a host or two from run to run. That jitter is the network, not the code; only the loopback comparison is fully deterministic.
+- Octets are read as decimal. A leading zero is dropped (`10.010.1` sweeps `10.10.1.0/24`), so `ping` never sees `010` and reads it as octal 8.
+
+- Hosts `.1` through `.254` are probed concurrently, one probe per host.
+
+- Live hosts go to stdout, one full IP per line, sorted by host number.
+
+- A one-line summary goes to stderr: `N hosts up on 192.168.1.0/24` (`1 host up` when there is one).
+
+- No argument: usage message on stderr, exit `2`.
+
+- Anything malformed, including an empty argument: `invalid network: <arg>`, exit `1`.
+
+- A well-formed network with any suffix other than exactly `/24`: `invalid network: <arg> (only /24 is supported)`, exit `1`. The tool always sweeps a `/24`, so it refuses rather than sweep a range other than the one asked for.
+
+One runtime quirk sits outside the scripts' reach: `bun` consumes a bare `--`, so `bun typescript/ping-sweep.ts --` sees no argument and exits `2` with the usage message.
 
 ## Implementations
 
-| Language | Dir | Probe method | Concurrency model | Root | Status |
-|----------|-----|--------------|-------------------|------|--------|
-| Perl | [`perl/`](perl/) | system `ping` | `fork()` per host | no | ✅ |
-| Python | [`python/`](python/) | system `ping` | `ThreadPoolExecutor` | no | ✅ |
-| Bash | [`bash/`](bash/) | system `ping` | background jobs + `wait` | no | ✅ |
-| C | [`c/`](c/) | **unprivileged ICMP** (`SOCK_DGRAM`, id-matched) | pthreads | no | ✅ |
-| Go | [`go/`](go/) | system `ping` | goroutines + `WaitGroup` | no | ✅ |
-| Rust | [`rust/`](rust/) | system `ping` | threads + `mpsc` | no | ✅ |
-| TypeScript | [`typescript/`](typescript/) | system `ping` (bun) | `Promise.all` | no | ✅ |
-| PowerShell | [`powershell/`](powershell/) | `Test-Connection` | `ForEach-Object -Parallel` | no | ✅ |
-| Ruby | [`ruby/`](ruby/) | system `ping` | thread per host (`Thread.new`) | no | ✅ |
-| Nim | [`nim/`](nim/) | system `ping` | `execProcesses` (bounded pool of 64) | no | ✅ |
+| Language | How to run | Probe | Concurrency |
+|----------|------------|-------|-------------|
+| Perl | `perl perl/ping-sweep.pl <network>` | system `ping` | `fork()` + `exec` per host, reaped with `wait()` |
+| Python | `python3 python/ping-sweep.py <network>` | system `ping` | `ThreadPoolExecutor` with 254 workers, `pool.map` |
+| Bash | `bash bash/ping-sweep.sh <network>` | system `ping` | one background job per host, each reaped with `wait <pid>` in host order |
+| TypeScript | `bun typescript/ping-sweep.ts <network>` | system `ping` via `Bun.spawn` | one process per host, `Promise.all` |
+| Ruby | `ruby ruby/ping-sweep.rb <network>` | system `ping` | one `Thread.new` per host, joined in order via `Thread#value` |
+| PowerShell | `pwsh powershell/ping-sweep.ps1 <network>` | `Test-Connection` | `ForEach-Object -Parallel -ThrottleLimit 64` |
+| C | `cc -O2 -pthread c/ping-sweep.c -o c/ping-sweep && ./c/ping-sweep <network>` | unprivileged ICMP socket | one pthread per host, `pthread_join` |
+| Go | `(cd go && go run . <network>)` | system `ping` | one goroutine per host, `sync.WaitGroup`, results over a channel |
+| Rust | `rustc -O rust/ping-sweep.rs -o rust/ping-sweep && ./rust/ping-sweep <network>` | system `ping` | one `std::thread` per host, results over `mpsc` |
+| Nim | `nim c -d:release --out:nim/ping-sweep nim/ping_sweep.nim && ./nim/ping-sweep <network>` | system `ping` | `osproc.execProcesses`, at most 64 at a time |
 
-**The C version is the odd one out, on purpose.** It opens an **unprivileged ICMP datagram socket** (`SOCK_DGRAM` + `IPPROTO_ICMP`) and speaks ICMP directly — build the echo request, checksum it, `connect()` to the target so replies are source-filtered, send, and match the reply by a per-host ICMP **id** (which keeps it correct even when many probes share one responder, as on loopback). The other nine lean on an external prober and instead show off their language's concurrency model. That contrast — *be the pinger* vs *orchestrate the pinger* — is the educational payload.
+Notes on the table:
 
-> **Platform note (C only):** verified on macOS. Unprivileged datagram-ICMP works without root on macOS, and on Linux only when `net.ipv4.ping_group_range` includes your gid (not always the default); on Linux the kernel also assigns the ICMP id itself, so the id-match would need to read the kernel-assigned value via `getsockname`. The other nine are portable as-is.
+- **C is the odd one out, on purpose.** It opens a `SOCK_DGRAM` + `IPPROTO_ICMP` socket per host and speaks ICMP itself: build the echo request, checksum it, `connect()` to the target so only that host's replies are delivered, send, then match the reply by a per-host ICMP id. The other nine hand the probe to the system `ping` (or, for PowerShell, to `Test-Connection`) and show off their language's concurrency instead. The writeup's title comes from that contrast.
 
-## Running
+- **PowerShell and Nim are the two bounded versions.** Both cap concurrency at 64, so a sweep takes a few timeout rounds instead of one. Every other version starts all 254 probes at once.
 
-No build step (scripting):
+- **Rust needs no Cargo.** The source uses only `std`, so a bare `rustc` builds it.
 
-```bash
-perl    perl/ping-sweep.pl        192.168.1.0/24
-python3 python/ping-sweep.py      192.168.1.0/24
-bash    bash/ping-sweep.sh        192.168.1.0/24
-bun     typescript/ping-sweep.ts  192.168.1.0/24
-pwsh    powershell/ping-sweep.ps1 192.168.1.0/24
-ruby    ruby/ping-sweep.rb        192.168.1.0/24
+- **Nim's source file is `ping_sweep.nim`**, because a Nim module name cannot contain `-`.
+
+- `go run` adds its own `exit status N` line on stderr after a non-zero exit. A binary from `go build` does not.
+
+Compiled binaries (`c/ping-sweep`, `rust/ping-sweep`, `go/ping-sweep`, `nim/ping-sweep`) are gitignored.
+
+## Requirements and privileges
+
+- **No root.** None of the ten calls `sudo` or opens a raw socket. Eight run the unprivileged system `ping`; C uses an unprivileged ICMP datagram socket.
+
+- **The C version is written for macOS.** Linux allows unprivileged ICMP datagram sockets only when `net.ipv4.ping_group_range` includes your group, and the Linux kernel rewrites the echo id, so the reply match in `c/ping-sweep.c` would need the kernel-assigned id (from `getsockname`) there. The source comment says the same.
+
+- **`ping -W` differs by OS.** It is milliseconds on macOS and seconds on Linux, so the eight versions that call `ping` check the OS and pass `-W 1000` or `-W 1`. C sets a one-second `SO_RCVTIMEO`; PowerShell passes `-TimeoutSeconds 1`.
+
+- **Go 1.26 or later**, per `go/go.mod`.
+
+- **PowerShell 7.0 or later**, for `ForEach-Object -Parallel`.
+
+- **bun**, not Node, for the TypeScript version (`Bun.spawn`).
+
+## Tests
+
+There is no automated test suite. Everything in the contract except the sweep itself can be checked offline: a missing or invalid argument exits before any probe is sent. For example:
+
+```
+$ python3 python/ping-sweep.py; echo "exit $?"
+usage: ping-sweep.py <network>   e.g. 192.168.1.0/24 or 192.168.1
+exit 2
+$ python3 python/ping-sweep.py 192.168.1.0/16; echo "exit $?"
+invalid network: 192.168.1.0/16 (only /24 is supported)
+exit 1
+$ python3 python/ping-sweep.py 10.010.1.300; echo "exit $?"
+invalid network: 10.010.1.300
+exit 1
 ```
 
-Compiled:
+Swap in any of the other run commands; the messages and exit codes match. The usage line names the script's own file, or `ping-sweep` for the compiled versions.
 
-```bash
-cc -O2 -pthread c/ping-sweep.c -o c/ping-sweep && ./c/ping-sweep 192.168.1.0/24
-(cd go && go run . 192.168.1.0/24)
-rustc -O rust/ping-sweep.rs -o rust/ping-sweep && ./rust/ping-sweep 192.168.1.0/24
-nim c -d:release --out:nim/ping-sweep nim/ping_sweep.nim && ./nim/ping-sweep 192.168.1.0/24
-```
-
-> **Portability note:** every version detects the OS because `ping -W` means *milliseconds* on macOS and *seconds* on Linux. The PowerShell version needs **7.4+** (for `Test-Connection -TimeoutSeconds`).
+On a live network, a single-probe sweep is not deterministic. Devices sleep and wake between probes, so two runs, or two implementations, can differ by a host or two. That is the network, not the code.
 
 ## Roadmap
 
-- Optional: raw-ICMP variants of the Go and Rust versions (via `golang.org/x/net/icmp` and the `socket2` crate) to match the C approach — turning the collection into a fuller "scripting vs systems" comparison.
+- Raw-ICMP variants of the Go and Rust versions (`golang.org/x/net/icmp`, the `socket2` crate) to match the C approach.
 
 ## License
 
-MIT © 2026 Michael Hixon
+MIT. See [LICENSE](LICENSE).
+
+More projects: [michaelhixon.com/making](https://michaelhixon.com/making/)
