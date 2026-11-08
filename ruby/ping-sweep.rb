@@ -40,7 +40,8 @@ def main
   begin
     base = parse_base(ARGV[0])
   rescue ArgumentError => e
-    warn e.message
+    # Not warn: it skips its newline when the echoed argument already ends in one.
+    $stderr.write(e.message, "\n")
     exit 1
   end
 

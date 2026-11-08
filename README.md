@@ -77,7 +77,9 @@ Compiled binaries (`c/ping-sweep`, `rust/ping-sweep`, `go/ping-sweep`, `nim/ping
 
 ## Tests
 
-There is no automated test suite. Everything in the contract except the sweep itself can be checked offline: a missing or invalid argument exits before any probe is sent. For example:
+`bash tests/run.sh` checks all ten against the 54 argument cases in `tests/cases.tsv` and prints a pass count per implementation. Exit code and stdout are matched exactly; stderr is matched exactly except on two rows that use a glob: the usage row, whose message names each script, and the non-UTF-8 row, which each runtime prints differently. A fake `ping` goes first on `PATH`, and every input is built on TEST-NET-1 (`192.0.2.0/24`, reserved for documentation). C and PowerShell do not call `ping`, so they run only the rows that expect exit 1 or 2. On macOS every run also sits inside `sandbox-exec` with outbound IP denied; on other systems, a parser regression in C or PowerShell would send probes to `192.0.2.0/24`. A missing toolchain is reported as skipped, never as a pass.
+
+Everything in the contract except the sweep itself can be checked offline: a missing or invalid argument exits before any probe is sent. For example:
 
 ```
 $ python3 python/ping-sweep.py; echo "exit $?"

@@ -1,0 +1,72 @@
+# The shared contract as 54 argument cases. tests/run.sh runs every implementation against each row.
+#
+# Columns are tab-separated: input, exit, stderr, stdout.
+#   input   the single argument passed. <none> means no argument at all; "" means an empty-string argument.
+#   exit    the expected exit code.
+#   stderr  the exact expected stderr, without its final newline. * means not checked;
+#           a glob: prefix means the rest is matched as a shell glob.
+#   stdout  the exact expected stdout, without its final newline. "" means empty.
+#
+# input, stderr and stdout are decoded with printf %b, so \n is a newline and \xHH is a raw byte.
+# Accepted rows run with a fake ping on PATH that answers only for host .1, so stdout is <network>.1
+# and the summary is "1 host up on <network>.0/24".
+#
+# Malformed: exit 1, "invalid network: <arg>"
+192.0000.2	1	invalid network: 192.0000.2	""
++192.0.2	1	invalid network: +192.0.2	""
+-192.0.2	1	invalid network: -192.0.2	""
+192.0.2abc	1	invalid network: 192.0.2abc	""
+ 192.0.2	1	invalid network:  192.0.2	""
+192.0.2 	1	invalid network: 192.0.2 	""
+192.0.²	1	invalid network: 192.0.²	""
+١٩٢.0.2	1	invalid network: ١٩٢.0.2	""
+192.0.300	1	invalid network: 192.0.300	""
+192.0	1	invalid network: 192.0	""
+192.0.x	1	invalid network: 192.0.x	""
+192..2	1	invalid network: 192..2	""
+""	1	invalid network: 	""
+192\n.0.2	1	invalid network: 192\n.0.2	""
+192.0.2\n	1	invalid network: 192.0.2\n	""
+192.0.2\njunk	1	invalid network: 192.0.2\njunk	""
+192.0\n.2	1	invalid network: 192.0\n.2	""
+192.0.2.4\n	1	invalid network: 192.0.2.4\n	""
+abc/xyz	1	invalid network: abc/xyz	""
+192.0.256	1	invalid network: 192.0.256	""
+192.0.2a/24	1	invalid network: 192.0.2a/24	""
+-Verbose	1	invalid network: -Verbose	""
+-v	1	invalid network: -v	""
+-ea	1	invalid network: -ea	""
+-?	1	invalid network: -?	""
+-h	1	invalid network: -h	""
+192.0.2.4.5	1	invalid network: 192.0.2.4.5	""
+192.0.2.	1	invalid network: 192.0.2.	""
+192.0.2.x	1	invalid network: 192.0.2.x	""
+192.0.2.999	1	invalid network: 192.0.2.999	""
+192.0.2.0.1/24	1	invalid network: 192.0.2.0.1/24	""
+192.0.2.256/24	1	invalid network: 192.0.2.256/24	""
+192.0/16	1	invalid network: 192.0/16	""
+# Not UTF-8: each runtime decodes the byte differently before printing it, so stderr is matched by glob.
+192.0.\xff	1	glob:invalid network: *	""
+# Well-formed network, wrong suffix: exit 1, "invalid network: <arg> (only /24 is supported)"
+192.0.2/16	1	invalid network: 192.0.2/16 (only /24 is supported)	""
+192.0.2.0/16	1	invalid network: 192.0.2.0/16 (only /24 is supported)	""
+192.0.2/	1	invalid network: 192.0.2/ (only /24 is supported)	""
+192.0.2/abc	1	invalid network: 192.0.2/abc (only /24 is supported)	""
+192.0.2/024	1	invalid network: 192.0.2/024 (only /24 is supported)	""
+192.0.2/24/24	1	invalid network: 192.0.2/24/24 (only /24 is supported)	""
+192.0.2/24 	1	invalid network: 192.0.2/24  (only /24 is supported)	""
+192.0.2/24\n	1	invalid network: 192.0.2/24\n (only /24 is supported)	""
+192.0.2.0/8	1	invalid network: 192.0.2.0/8 (only /24 is supported)	""
+192.0.2/2\xe2\x80\x8b4	1	invalid network: 192.0.2/2\xe2\x80\x8b4 (only /24 is supported)	""
+192.0.2/24\xe2\x80\x8b	1	invalid network: 192.0.2/24\xe2\x80\x8b (only /24 is supported)	""
+192.0.2/\xc2\xad24	1	invalid network: 192.0.2/\xc2\xad24 (only /24 is supported)	""
+# Accepted: exit 0, on TEST-NET-1 (192.0.2.0/24, reserved for documentation)
+192.0.2	0	1 host up on 192.0.2.0/24	192.0.2.1
+192.0.2.0	0	1 host up on 192.0.2.0/24	192.0.2.1
+192.0.2.0/24	0	1 host up on 192.0.2.0/24	192.0.2.1
+192.0.2/24	0	1 host up on 192.0.2.0/24	192.0.2.1
+192.0.2.50	0	1 host up on 192.0.2.0/24	192.0.2.1
+192.0.2.255	0	1 host up on 192.0.2.0/24	192.0.2.1
+192.000.002/24	0	1 host up on 192.0.2.0/24	192.0.2.1
+# No argument: exit 2, a usage line naming the script
+<none>	2	glob:usage: ping-sweep*<network>   e.g. 192.168.1.0/24 or 192.168.1	""
